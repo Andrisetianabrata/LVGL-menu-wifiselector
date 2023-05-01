@@ -2,10 +2,19 @@
 #define LGFX_USE_V1
 #include <lvgl.h>
 #include <LovyanGFX.hpp>
+// #define LV_USE_LOG 0
+#if LV_USE_LOG != 0
+/* Serial debugging */
+void my_print(const char *buf)
+{
+  Serial.printf(buf);
+  Serial.flush();
+}
+#endif
 
 class LGFX : public lgfx::LGFX_Device
 {
-  lgfx::Panel_ILI9488 _panel_instance;
+  lgfx::Panel_ILI9341 _panel_instance;
   lgfx::Bus_SPI _bus_instance;
   lgfx::Light_PWM _light_instance;
   lgfx::Touch_XPT2046 _touch_instance;
@@ -43,8 +52,8 @@ public:
 
       // ※ 以下の設定値はパネル毎に一般的な初期値が設定されていますので、不明な項目はコメントアウトして試してみてください。
 
-      cfg.panel_width = 320;    // 実際に表示可能な幅
-      cfg.panel_height = 480;   // 実際に表示可能な高さ
+      cfg.panel_width = 240;    // 実際に表示可能な幅
+      cfg.panel_height = 320;   // 実際に表示可能な高さ
       cfg.offset_x = 0;         // パネルのX方向オフセット量
       cfg.offset_y = 0;         // パネルのY方向オフセット量
       cfg.offset_rotation = 0;  // 回転方向の値のオフセット 0~7 (4~7は上下反転)
@@ -105,22 +114,11 @@ public:
   }
 };
 
-// #define LV_USE_LOG 0
-
-#if LV_USE_LOG != 0
-/* Serial debugging */
-void my_print(const char *buf)
-{
-  Serial.printf(buf);
-  Serial.flush();
-}
-#endif
-
 LGFX tft;
 
 /*Change to your screen resolution*/
-static const uint16_t screenWidth = 480;
-static const uint16_t screenHeight = 320;
+static const uint16_t screenWidth = 320;
+static const uint16_t screenHeight = 240;
 static lv_disp_draw_buf_t draw_buf;
 static lv_color_t buf[screenWidth * 10];
 
@@ -166,17 +164,18 @@ static void setDriver(void)
   lv_log_register_print_cb(my_print); /* register print function for debugging */
 #endif
 
-  tft.begin();          /* TFT init */
-  tft.setRotation(3);   /* Landscape orientation, flipped */
+  tft.begin();        /* TFT init */
+  tft.setRotation(3); /* Landscape orientation, flipped */
   tft.setBrightness(255);
-  uint16_t calData[] = {303, 3902, 249, 304, 3782, 3872, 3825, 287};
+  // uint16_t calData[] = {3799, 463, 3775, 3855, 242, 403, 226, 3907}; // 480 x 320
+  uint16_t calData[] = {3792, 393, 3851, 3883, 261, 403, 224, 3897}; // 320 x 240
   tft.setTouchCalibrate(calData);
   // uint16_t caldata[8];
   // tft.calibrateTouch(caldata, TFT_BLACK, TFT_WHITE, 8);
-  // for(int i = 0; i < 8; i++)
+  // for (int i = 0; i < 8; i++)
   // {
-  //     Serial.print(caldata[i]);
-  //     Serial.print(",");
+  //   Serial.print(caldata[i]);
+  //   Serial.print(",");
   // }
 
   lv_init();
@@ -198,6 +197,58 @@ static void setDriver(void)
   indev_drv.type = LV_INDEV_TYPE_POINTER;
   indev_drv.read_cb = my_touchpad_read;
   lv_indev_drv_register(&indev_drv);
-
   Serial.println("Setup done");
 }
+
+typedef enum
+{
+  NONE,
+  NETWORK_SEARCHING,
+  NETWORK_CONNECTED_POPUP,
+  NETWORK_CONNECTED,
+  NETWORK_CONNECT_FAILED
+} Network_Status_t;
+Network_Status_t networkStatus = NONE;
+enum
+{
+  LV_MENU_ITEM_BUILDER_VARIANT_1,
+  LV_MENU_ITEM_BUILDER_VARIANT_2
+};
+typedef uint8_t lv_menu_builder_variant_t;
+
+static lv_obj_t *menu_screen;
+static lv_obj_t *menu;
+static lv_obj_t *screen;
+static lv_obj_t *bar1;
+static lv_obj_t *bar2;
+static lv_obj_t *bar3;
+static lv_obj_t *bar4;
+static lv_obj_t *label1;
+static lv_obj_t *label2;
+static lv_obj_t *label3;
+static lv_obj_t *label4;
+static lv_timer_t *timer;
+static lv_obj_t *wfList;
+static lv_obj_t *root_page;
+static lv_obj_t *listWiFisection;
+static lv_obj_t *txtArea;
+static lv_obj_t *kb;
+static lv_obj_t *container;
+static lv_obj_t *mbox1;
+static lv_obj_t *msg;
+
+static void ta_event_cb(lv_event_t *e);
+static void setting_button(lv_event_t *e);
+static void switch_handler_wifi(lv_event_t *e);
+static void list_event_handler(lv_event_t *e);
+static void back_event_handler(lv_event_t *e);
+static void switch_handler(lv_event_t *e);
+static void pass_input(lv_event_t *e);
+static void showingFoundWiFiList();
+static void networkScanner();
+static void timerForNetwork(lv_timer_t *timer);
+static lv_obj_t *create_text(lv_obj_t *parent, const char *icon, const char *txt, lv_menu_builder_variant_t builder_variant);
+static lv_obj_t *create_slider(lv_obj_t *parent, const char *icon, const char *txt, int32_t min, int32_t max, int32_t val);
+static lv_obj_t *create_switch(lv_obj_t *parent, const char *icon, const char *txt, bool chk);
+static void scanWIFITask(void *pvParameters);
+static void beginWIFITask(void *pvParameters);

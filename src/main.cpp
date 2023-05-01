@@ -5,54 +5,19 @@
 
 TaskHandle_t ntScanTaskHandler, ntConnectTaskHandler;
 bool passMode = true;
-typedef enum
-{
-  NONE,
-  NETWORK_SEARCHING,
-  NETWORK_CONNECTED_POPUP,
-  NETWORK_CONNECTED,
-  NETWORK_CONNECT_FAILED
-} Network_Status_t;
-Network_Status_t networkStatus = NONE;
-enum
-{
-  LV_MENU_ITEM_BUILDER_VARIANT_1,
-  LV_MENU_ITEM_BUILDER_VARIANT_2
-};
-typedef uint8_t lv_menu_builder_variant_t;
-
 static int foundNetworks = 0;
 std::vector<String> foundWifiList;
 String pass, ssid;
 
-static lv_timer_t *timer;
-static lv_obj_t *wfList;
-static lv_obj_t *root_page;
-static lv_obj_t *listWiFisection;
-static lv_obj_t *txtArea;
-static lv_obj_t *kb;
-static lv_obj_t *container;
-static lv_obj_t *mbox1;
-static lv_obj_t* msg;
-
-static void ta_event_cb(lv_event_t *e);
-static void switch_handler_wifi(lv_event_t *e);
-static void list_event_handler(lv_event_t *e);
-static void back_event_handler(lv_event_t *e);
-static void switch_handler(lv_event_t *e);
-static void pass_input(lv_event_t *e);
-static void showingFoundWiFiList();
-static void networkScanner();
-static void timerForNetwork(lv_timer_t *timer);
-static lv_obj_t *create_text(lv_obj_t *parent, const char *icon, const char *txt, lv_menu_builder_variant_t builder_variant);
-static lv_obj_t *create_slider(lv_obj_t *parent, const char *icon, const char *txt, int32_t min, int32_t max, int32_t val);
-static lv_obj_t *create_switch(lv_obj_t *parent, const char *icon, const char *txt, bool chk);
-static void scanWIFITask(void *pvParameters);
-static void beginWIFITask(void *pvParameters);
-
 void lv_example_menu_5(void)
 {
-  lv_obj_t *menu = lv_menu_create(lv_scr_act());
+  menu_screen = lv_obj_create(NULL);
+  lv_obj_clear_flag(menu_screen, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_width(menu_screen, 320);
+  lv_obj_set_height(menu_screen, 240);
+  lv_obj_set_style_border_width(menu_screen, 0, LV_PART_MAIN);
+
+  menu = lv_menu_create(menu_screen);
 
   lv_color_t bg_color = lv_obj_get_style_bg_color(menu, 0);
   if (lv_color_brightness(bg_color) > 127)
@@ -84,15 +49,21 @@ void lv_example_menu_5(void)
   lv_obj_set_style_pad_hor(sub_sound_page, lv_obj_get_style_pad_left(lv_menu_get_main_header(menu), 0), 0);
   lv_menu_separator_create(sub_sound_page);
   section = lv_menu_section_create(sub_sound_page);
-  create_switch(section, LV_SYMBOL_AUDIO, "Sound", false);
+  create_switch(section, LV_SYMBOL_LIST, "Minggu", false);
+  create_switch(section, LV_SYMBOL_LIST, "Senin", false);
+  create_switch(section, LV_SYMBOL_LIST, "Selasa", false);
+  create_switch(section, LV_SYMBOL_LIST, "Rabu", false);
+  create_switch(section, LV_SYMBOL_LIST, "Kamis", false);
+  create_switch(section, LV_SYMBOL_LIST, "Jum'at", false);
+  create_switch(section, LV_SYMBOL_LIST, "Sabtu", false);
 
+  // WiFi List 
   lv_obj_t *sub_wifi_menu = lv_menu_page_create(menu, NULL);
   lv_obj_set_style_pad_hor(sub_wifi_menu, lv_obj_get_style_pad_left(lv_menu_get_main_header(menu), 0), 0);
   lv_menu_separator_create(sub_wifi_menu);
   section = lv_menu_section_create(sub_wifi_menu);
   cont = create_switch(section, LV_SYMBOL_WIFI, "WiFi", false);
   lv_obj_add_event_cb(lv_obj_get_child(cont, 2), switch_handler_wifi, LV_EVENT_ALL, NULL);
-  // cont = create_text(section, NULL, "WiFi List", LV_MENU_ITEM_BUILDER_VARIANT_1);
   listWiFisection = lv_obj_create(section);
   lv_obj_set_size(listWiFisection, lv_pct(100), 200);
   lv_obj_set_style_border_width(listWiFisection, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -131,23 +102,15 @@ void lv_example_menu_5(void)
   cont = create_text(section, NULL, "Legal information", LV_MENU_ITEM_BUILDER_VARIANT_1);
   lv_menu_set_load_page_event(menu, cont, sub_legal_info_page);
 
-  lv_obj_t *sub_menu_mode_page = lv_menu_page_create(menu, NULL);
-  lv_obj_set_style_pad_hor(sub_menu_mode_page, lv_obj_get_style_pad_left(lv_menu_get_main_header(menu), 0), 0);
-  lv_menu_separator_create(sub_menu_mode_page);
-  section = lv_menu_section_create(sub_menu_mode_page);
-  cont = create_switch(section, LV_SYMBOL_AUDIO, "Sidebar enable", true);
-  lv_obj_add_event_cb(lv_obj_get_child(cont, 2), switch_handler, LV_EVENT_VALUE_CHANGED, menu);
-
   /*Create a root page*/
   root_page = lv_menu_page_create(menu, "Settings");
   lv_obj_set_style_pad_hor(root_page, lv_obj_get_style_pad_left(lv_menu_get_main_header(menu), 0), 0);
   section = lv_menu_section_create(root_page);
-  cont = create_text(section, LV_SYMBOL_SETTINGS, "Mechanics", LV_MENU_ITEM_BUILDER_VARIANT_1);
+  cont = create_text(section, LV_SYMBOL_SETTINGS, "Calibration", LV_MENU_ITEM_BUILDER_VARIANT_1);
   lv_menu_set_load_page_event(menu, cont, sub_mechanics_page);
-  cont = create_text(section, LV_SYMBOL_AUDIO, "Sound", LV_MENU_ITEM_BUILDER_VARIANT_1);
+  cont = create_text(section, LV_SYMBOL_AUDIO, "Schedule", LV_MENU_ITEM_BUILDER_VARIANT_1);
   lv_menu_set_load_page_event(menu, cont, sub_sound_page);
-  cont = create_text(section, LV_SYMBOL_SETTINGS, "Display", LV_MENU_ITEM_BUILDER_VARIANT_1);
-  lv_menu_set_load_page_event(menu, cont, sub_display_page);
+  // lv_menu_set_load_page_event(menu, cont, sub_display_page);
   cont = create_text(section, LV_SYMBOL_WIFI, "WiFi Setitng", LV_MENU_ITEM_BUILDER_VARIANT_1);
   lv_menu_set_load_page_event(menu, cont, sub_wifi_menu);
 
@@ -155,16 +118,13 @@ void lv_example_menu_5(void)
   section = lv_menu_section_create(root_page);
   cont = create_text(section, NULL, "About", LV_MENU_ITEM_BUILDER_VARIANT_1);
   lv_menu_set_load_page_event(menu, cont, sub_about_page);
-  cont = create_text(section, LV_SYMBOL_SETTINGS, "Menu mode", LV_MENU_ITEM_BUILDER_VARIANT_1);
-  lv_menu_set_load_page_event(menu, cont, sub_menu_mode_page);
 
-  lv_menu_set_sidebar_page(menu, root_page);
-
-  lv_event_send(lv_obj_get_child(lv_obj_get_child(lv_menu_get_cur_sidebar_page(menu), 0), 0), LV_EVENT_CLICKED, NULL);
+  lv_menu_set_sidebar_page(menu, NULL);
+  lv_menu_set_page(menu, root_page);
 
   // Container
-  container = lv_obj_create(lv_scr_act());
-  lv_obj_set_size(container, 480, 320);
+  container = lv_obj_create(menu_screen);
+  lv_obj_set_size(container, lv_pct(100), lv_pct(100));
   lv_obj_set_style_pad_all(container, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
   lv_obj_set_style_bg_color(container, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT);
   lv_obj_set_style_bg_opa(container, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -172,7 +132,7 @@ void lv_example_menu_5(void)
   lv_obj_center(container);
   lv_obj_add_flag(container, LV_OBJ_FLAG_HIDDEN);
   mbox1 = lv_obj_create(container);
-  lv_obj_set_size(mbox1, 300, 110);
+  lv_obj_set_size(mbox1, 200, 110);
   lv_obj_clear_flag(mbox1, LV_OBJ_FLAG_SCROLLABLE);
   txtArea = lv_textarea_create(mbox1);
   lv_obj_set_size(txtArea, lv_pct(100), 40);
@@ -204,13 +164,214 @@ void lv_example_menu_5(void)
   lv_obj_center(label);
   btn = lv_btn_create(btn_cont);
   label = lv_label_create(btn);
-  lv_label_set_text(label, "Show Pass");
+  lv_label_set_text(label, "Show");
   lv_obj_add_event_cb(btn, pass_input, LV_EVENT_ALL, label);
-  lv_obj_set_size(btn, 100, 20);
+  lv_obj_set_size(btn, 50, 20);
   lv_obj_center(label);
   lv_obj_set_flex_flow(btn_cont, LV_FLEX_FLOW_ROW);
   lv_obj_set_flex_flow(mbox1, LV_FLEX_FLOW_COLUMN);
 }
+void home(void)
+{
+  screen = lv_obj_create(NULL);
+  lv_obj_clear_flag(screen, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_width(screen, 320);
+  lv_obj_set_height(screen, 240);
+  lv_obj_set_style_border_width(screen, 0, LV_PART_MAIN);
+
+  lv_obj_t *clock_label = lv_label_create(screen);
+  lv_obj_set_size(clock_label, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+  lv_obj_set_pos(clock_label, 22, 9 - 5);
+  lv_label_set_text(clock_label, "20:21");
+  lv_obj_set_style_text_font(clock_label, &lv_font_montserrat_12, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+  LV_IMG_DECLARE(icon_wifi);
+  lv_obj_t *img_wifi = lv_img_create(screen);
+  lv_img_set_src(img_wifi, &icon_wifi);
+  lv_obj_set_size(img_wifi, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+  lv_obj_set_pos(img_wifi, 278, 6 - 5);
+  lv_img_set_antialias(img_wifi, true);
+
+  lv_obj_t *red = lv_obj_create(screen);
+  lv_obj_set_size(red, 78, 78);
+  lv_obj_set_pos(red, 10, 40 - 13);
+  lv_obj_set_style_radius(red, 5, LV_PART_MAIN);
+  lv_obj_set_style_bg_color(red, lv_color_hex(0xDB0069), LV_PART_MAIN);
+  lv_obj_set_style_border_width(red, 0, LV_PART_MAIN);
+
+  LV_IMG_DECLARE(icon_info);
+  lv_obj_t *img_info = lv_img_create(red);
+  lv_img_set_src(img_info, &icon_info);
+  lv_obj_set_size(img_info, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+  lv_obj_center(img_info);
+  lv_obj_clear_flag(img_info, LV_OBJ_FLAG_CLICKABLE);
+
+  lv_obj_t *black = lv_obj_create(screen);
+  lv_obj_set_size(black, 78, 78);
+  lv_obj_set_pos(black, 10, 123 - 13);
+  lv_obj_set_style_radius(black, 5, LV_PART_MAIN);
+  lv_obj_set_style_bg_color(black, lv_color_hex(0x2ECE77), LV_PART_MAIN);
+  lv_obj_set_style_border_width(black, 0, LV_PART_MAIN);
+  lv_obj_add_event_cb(black, setting_button, LV_EVENT_ALL, NULL);
+
+  LV_IMG_DECLARE(icon_Tools_);
+  lv_obj_t *img_tools = lv_img_create(black);
+  lv_img_set_src(img_tools, &icon_Tools_);
+  lv_obj_set_size(img_tools, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+  lv_obj_center(img_tools);
+  lv_obj_clear_flag(img_tools, LV_OBJ_FLAG_CLICKABLE);
+
+  lv_obj_t *bigBlue = lv_obj_create(screen);
+  lv_obj_set_size(bigBlue, 218, 161);
+  lv_obj_set_pos(bigBlue, 93, 40 - 13);
+  lv_obj_set_style_radius(bigBlue, 5, LV_PART_MAIN);
+  lv_obj_set_style_bg_color(bigBlue, lv_color_hex(0x870093), LV_PART_MAIN);
+  lv_obj_set_style_border_width(bigBlue, 0, LV_PART_MAIN);
+  lv_obj_clear_flag(bigBlue, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_style_pad_all(bigBlue, 0, LV_PART_MAIN);
+
+  lv_obj_t *fan_switch = lv_obj_create(screen);
+  lv_obj_set_size(fan_switch, 33, 33);
+  lv_obj_set_pos(fan_switch, 93, 197);
+  lv_obj_set_style_radius(fan_switch, 5, LV_PART_MAIN);
+  lv_obj_set_style_bg_color(fan_switch, lv_color_hex(0xDB0069), LV_PART_MAIN);
+  lv_obj_set_style_border_width(fan_switch, 0, LV_PART_MAIN);
+  lv_obj_clear_flag(fan_switch, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_style_pad_all(fan_switch, 0, LV_PART_MAIN);
+  LV_IMG_DECLARE(icon_fan);
+  lv_obj_t *img_fan = lv_img_create(fan_switch);
+  lv_img_set_src(img_fan, &icon_fan);
+  lv_obj_set_size(img_fan, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+  lv_obj_center(img_fan);
+  lv_obj_clear_flag(img_fan, LV_OBJ_FLAG_CLICKABLE);
+
+  lv_obj_t *water_switch = lv_obj_create(screen);
+  lv_obj_set_size(water_switch, 33, 33);
+  lv_obj_set_pos(water_switch, 130, 197);
+  lv_obj_set_style_radius(water_switch, 5, LV_PART_MAIN);
+  lv_obj_set_style_bg_color(water_switch, lv_color_hex(0xDB0069), LV_PART_MAIN);
+  lv_obj_set_style_border_width(water_switch, 0, LV_PART_MAIN);
+  lv_obj_clear_flag(water_switch, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_style_pad_all(water_switch, 0, LV_PART_MAIN);
+  LV_IMG_DECLARE(icon_water);
+  lv_obj_t *img_water = lv_img_create(water_switch);
+  lv_img_set_src(img_water, &icon_water);
+  lv_obj_set_size(img_water, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+  lv_obj_center(img_water);
+  lv_obj_clear_flag(img_water, LV_OBJ_FLAG_CLICKABLE);
+
+  lv_obj_t *icon_mix = lv_obj_create(screen);
+  lv_obj_set_size(icon_mix, 33, 33);
+  lv_obj_set_pos(icon_mix, 130, 197);
+  lv_obj_set_style_radius(icon_mix, 5, LV_PART_MAIN);
+  lv_obj_set_style_bg_color(icon_mix, lv_color_hex(0xDB0069), LV_PART_MAIN);
+  lv_obj_set_style_border_width(icon_mix, 0, LV_PART_MAIN);
+  lv_obj_clear_flag(icon_mix, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_style_pad_all(icon_mix, 0, LV_PART_MAIN);
+  LV_IMG_DECLARE(icon_random);
+  lv_obj_t *img_mix = lv_img_create(icon_mix);
+  lv_img_set_src(img_mix, &icon_random);
+  lv_obj_set_size(img_mix, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+  lv_obj_center(img_mix);
+  lv_obj_clear_flag(img_mix, LV_OBJ_FLAG_CLICKABLE);
+
+
+  static lv_style_t style_bg;
+  static lv_style_t style_indic;
+
+  lv_style_init(&style_bg);
+  lv_style_set_border_color(&style_bg, lv_palette_main(LV_PALETTE_BLUE));
+  lv_style_set_border_width(&style_bg, 2);
+  lv_style_set_pad_all(&style_bg, 3); /*To make the indicator smaller*/
+  lv_style_set_radius(&style_bg, 50);
+
+  lv_style_init(&style_indic);
+  lv_style_set_bg_opa(&style_indic, LV_OPA_COVER);
+  lv_style_set_bg_color(&style_indic, lv_palette_main(LV_PALETTE_BLUE));
+  lv_style_set_radius(&style_indic, 50);
+
+  bar1 = lv_bar_create(bigBlue);
+  lv_obj_add_style(bar1, &style_indic, LV_PART_INDICATOR);
+  lv_obj_add_style(bar1, &style_bg, 0);
+  lv_obj_set_size(bar1, 15, 100);
+  lv_bar_set_range(bar1, -20, 40);
+  lv_obj_set_pos(bar1, 16, 45);
+  bar2 = lv_bar_create(bigBlue);
+  lv_obj_add_style(bar2, &style_indic, LV_PART_INDICATOR);
+  lv_obj_add_style(bar2, &style_bg, 0);
+  lv_obj_set_size(bar2, 15, 100);
+  lv_bar_set_range(bar2, -20, 40);
+  lv_obj_set_pos(bar2, 38, 45);
+  bar3 = lv_bar_create(bigBlue);
+  lv_obj_add_style(bar3, &style_indic, LV_PART_INDICATOR);
+  lv_obj_add_style(bar3, &style_bg, 0);
+  lv_obj_set_size(bar3, 15, 100);
+  lv_bar_set_range(bar3, -20, 40);
+  lv_obj_set_pos(bar3, 60, 45);
+  bar4 = lv_bar_create(bigBlue);
+  lv_obj_add_style(bar4, &style_indic, LV_PART_INDICATOR);
+  lv_obj_add_style(bar4, &style_bg, 0);
+  lv_obj_set_size(bar4, 15, 100);
+  lv_bar_set_range(bar4, -20, 40);
+  lv_obj_set_pos(bar4, 82, 45);
+
+  label1 = lv_label_create(bigBlue);
+  lv_obj_set_style_text_font(label1, &lv_font_montserrat_10, 0);
+  lv_obj_set_pos(label1, 110, 133);
+
+  label2 = lv_label_create(bigBlue);
+  lv_obj_set_style_text_font(label2, &lv_font_montserrat_10, 0);
+  lv_obj_set_pos(label2, 145, 118);
+
+  label3 = lv_label_create(bigBlue);
+  lv_obj_set_style_text_font(label3, &lv_font_montserrat_10, 0);
+  lv_obj_set_pos(label3, 130, 102);
+
+  label4 = lv_label_create(bigBlue);
+  lv_obj_set_style_text_font(label4, &lv_font_montserrat_10, 0);
+  lv_obj_set_pos(label4, 140, 86);
+}
+
+void setup()
+{
+  Serial.begin(115200);
+  setDriver();
+  lv_disp_t *dispp = lv_disp_get_default();
+  lv_theme_t *theme = lv_theme_default_init(dispp, lv_palette_main(LV_PALETTE_BLUE), lv_palette_main(LV_PALETTE_RED), true, &lv_font_montserrat_12);
+  lv_disp_set_theme(dispp, theme);
+  home();
+  lv_example_menu_5();
+  lv_disp_load_scr(screen);
+}
+void loop()
+{
+  lv_timer_handler();
+  static uint32_t prev = millis();
+  static char text[20];
+  if (millis() - prev > 1000)
+  {
+    float suhu = random(100);
+    float ph = random(14);
+    float suhu_air = random(100);
+    int tds = random(1000);
+    lv_bar_set_value(bar1, suhu, LV_ANIM_ON);
+    lv_bar_set_value(bar2, ph, LV_ANIM_ON);
+    lv_bar_set_value(bar3, suhu_air, LV_ANIM_ON);
+    lv_bar_set_value(bar4, tds, LV_ANIM_ON);
+
+    sprintf(text, "SUHU AIR : %.2f\u00b0c", suhu_air);
+    lv_label_set_text(label1, text);
+    sprintf(text, "pH : %.2fpH", ph);
+    lv_label_set_text(label2, text);
+    sprintf(text, "SUHU : %.2f\u00b0c", suhu);
+    lv_label_set_text(label3, text);
+    sprintf(text, "TDS : %dppm", tds);
+    lv_label_set_text(label4, text);
+    prev = millis();
+  }
+  delay(5);
+}
+
 static void back_event_handler(lv_event_t *e)
 {
   lv_obj_t *obj = lv_event_get_target(e);
@@ -218,8 +379,9 @@ static void back_event_handler(lv_event_t *e)
 
   if (lv_menu_back_btn_is_root(menu, obj))
   {
-    lv_obj_t *mbox1 = lv_msgbox_create(NULL, "Hello", "Root back btn click.", NULL, true);
-    lv_obj_center(mbox1);
+    // lv_obj_t *mbox1 = lv_msgbox_create(NULL, "Hello", "Root back btn click.", NULL, true);
+    // lv_obj_center(mbox1);
+    lv_scr_load_anim(screen, LV_SCR_LOAD_ANIM_FADE_ON, 0, 0, false);
   }
 }
 static void switch_handler(lv_event_t *e)
@@ -334,18 +496,6 @@ static lv_obj_t *create_switch(lv_obj_t *parent, const char *icon, const char *t
   lv_obj_add_state(sw, chk ? LV_STATE_CHECKED : 0);
 
   return obj;
-}
-
-void setup()
-{
-  Serial.begin(115200);
-  setDriver();
-  lv_example_menu_5();
-}
-void loop()
-{
-  lv_timer_handler();
-  delay(5);
 }
 
 static void timerForNetwork(lv_timer_t *timer)
@@ -471,18 +621,18 @@ static void list_event_handler(lv_event_t *e)
   if (code == LV_EVENT_CLICKED)
   {
     String selectedItem = String(lv_list_get_btn_text(wfList, obj));
-    for (int i = 0; i < selectedItem.length() - 1; i++)
-    {
-      if ((selectedItem.substring(i, i + 3) == ") *"))
-      {
-        // ssidName = selectedItem.substring(0, i);
-        // lv_label_set_text_fmt(mboxTitle, "Selected WiFi SSID: %s", ssidName);
-        // lv_obj_move_foreground(mboxConnect);
-        ssid = selectedItem.substring(0, selectedItem.indexOf("(-") - 1);
-        Serial.printf("SSID : %s\n", ssid);
-        break;
-      }
-    }
+    // for (int i = 0; i < selectedItem.length() - 1; i++)
+    // {
+    //   if ((selectedItem.substring(i, i + 3) == ") *"))
+    //   {
+    //     // ssidName = selectedItem.substring(0, i);
+    //     // lv_label_set_text_fmt(mboxTitle, "Selected WiFi SSID: %s", ssidName);
+    //     // lv_obj_move_foreground(mboxConnect);
+    //     ssid = selectedItem.substring(0, selectedItem.indexOf("(-") - 1);
+    //     Serial.printf("SSID : %s\n", ssid);
+    //     break;
+    //   }
+    // }
     if (selectedItem.indexOf(") *") != -1)
     {
       lv_obj_clear_flag(container, LV_OBJ_FLAG_HIDDEN);
@@ -523,7 +673,7 @@ static void pass_input(lv_event_t *e)
   {
     Serial.println(lv_label_get_text(label));
     // lv_obj_add_flag(container, LV_OBJ_FLAG_HIDDEN);
-    if (strcmp(lv_label_get_text(label), "Show Pass") == 0)
+    if (strcmp(lv_label_get_text(label), "Show") == 0)
     {
       passMode = !passMode;
       lv_textarea_set_password_mode(txtArea, passMode);
@@ -544,5 +694,15 @@ static void pass_input(lv_event_t *e)
       lv_textarea_set_text(txtArea, "");
       networkConnector();
     }
+  }
+}
+static void setting_button(lv_event_t *e)
+{
+  lv_event_code_t event_code = lv_event_get_code(e);
+  lv_obj_t *target = lv_event_get_target(e);
+  if (event_code == LV_EVENT_CLICKED)
+  {
+    // _ui_screen_change(ui_Seting, LV_SCR_LOAD_ANIM_FADE_ON, 0, 0);
+    lv_scr_load_anim(menu_screen, LV_SCR_LOAD_ANIM_FADE_ON, 0, 0, false);
   }
 }
